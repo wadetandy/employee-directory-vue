@@ -9,7 +9,7 @@ import {
 
 @Model()
 export class ApplicationRecord extends SpraypaintBase {
-  static baseUrl = "/"
+  static baseUrl = "http://localhost:3000/"
   static apiNamespace = "api/v1"
 }
 

@@ -59,7 +59,7 @@
 </template>
 
 <script lang="ts">
-import Vue from 'vue'
+import Vue, { PropType } from 'vue'
 import { onCreated, computed, value } from 'vue-function-api'
 
 import EventBus from "@/event-bus"
@@ -67,67 +67,19 @@ import { Employee, Position, employeeDirectoryApi } from '../api/employee-direct
 
 export default Vue.extend({
   name: 'persist',
-  setup() {
-    const {
-      record: employeeRecord,
-      loading,
-    } = employeeDirectoryApi.loadSingleRecord('employees', undefined)
-
-    const employee = computed(() => {
-      if (employeeRecord.value) {
-        return employeeRecord.value
-      } else {
-        return { }
-      }
-    })
-
-    async function fetchDepartments() {
-      // possibleDepartments = (await Department.all()).data
+  props: {
+    employee: {
+      required: true,
+      type: Object as PropType<Employee>
     }
-    async function submit() {
-      // await this.employee.save({ with: { positions: "department" }})
-
-      // const success = await this.employee
-      //   .save({ with: { positions: "department" }})
-      // if (success) {
-      //   EventBus.$emit("employee_save", this.employee)
-      //   this.success = true
-      //   let reset = () => {
-      //     this.success = false
-      //   }
-      //   setTimeout(reset, 2000)
-      // }
-    }
-    async function loadEmployee(employeeId: string) {
-      // let { data } = await Employee
-      //   .includes({ positions: "department" })
-      //   .find(employeeId)
-      //  if (data) this.employee = data
-    }
-    function addPosition() {
-      // this.employee.positions.unshift(new Position())
-    }
-
-    function removePosition(position: Position) {
-      // position.isMarkedForDestruction = true
-    }
-
-    onCreated(() => {
-      EventBus.$on('employee_selected', (employeeId: string) => {
-        loadEmployee(employeeId)
-      })
-
-      fetchDepartments()
-    })
+  },
+  setup(props) {
+    const employee = props.employee
 
     return {
       employee,
       success: false as boolean,
       possibleDepartments: [],
-      submit,
-      loadEmployee,
-      addPosition,
-      removePosition,
     }
   },
 });

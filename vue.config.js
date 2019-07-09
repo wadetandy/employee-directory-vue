@@ -1,6 +1,10 @@
 module.exports = {
   devServer: {
-    proxy: process.env.PROXY
+    proxy: {
+      '/api': {
+        target: process.env.PROXY
+      },
+    }
   },
   lintOnSave: false
 }

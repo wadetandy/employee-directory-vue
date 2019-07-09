@@ -6,10 +6,10 @@
         <div class="row">
           <div class="col-md-6">
             <div class='form-group'>
-              <input v-model="query.first_name.prefix" type='search' class='form-control' placeholder="First Name" />
+              <input v-model="scope.first_name.prefix" type='search' class='form-control' placeholder="First Name" />
             </div>
             <div class='form-group'>
-              <input v-model="query.last_name.prefix" type='search' class='form-control' placeholder="Last Name" />
+              <input v-model="scope.last_name.prefix" type='search' class='form-control' placeholder="Last Name" />
             </div>
           </div>
           <div class="col-md-6">
@@ -44,12 +44,12 @@
         <tr v-for="employee in employees" :key="employee.id">
           <td>
             <a @click="selectEmployee(employee)">
-              {{ employee.fullName }}
+              {{ employee.last_name }}, {{ employee.first_name }}
             </a>
           </td>
           <td>{{ employee.age }}</td>
-          <td>{{ employee.currentPosition.title }}</td>
-          <td>{{ employee.currentPosition.department.name }}</td>
+          <td>Position title</td>
+          <td>Department Name</td>
         </tr>
       </tbody>
     </table>
@@ -58,73 +58,115 @@
 
 <script lang="ts">
 import Vue from 'vue';
-import { Employee } from "@/models"
-import { Scope, WhereClause, SortScope } from "spraypaint"
+// import { Employee } from "@/models"
+// import { Scope, WhereClause, SortScope } from "spraypaint"
 import EventBus from "@/event-bus"
+
+import { onCreated, computed, value } from 'vue-function-api'
+
+import { WhereClause, IncludeDirective, Sort, GraphitiListQuery } from '../hooks'
+import { Employee, Position, employeeDirectoryApi } from '../api/employee-directory'
+
 
 export default Vue.extend({
   name: 'query',
-  data() {
-    let sort : SortScope = {
+  setup() {
+    const initialScope : WhereClause<Employee> = {
+      first_name: {
+        prefix: ''
+      },
+      last_name: {
+        prefix: ''
+      },
+    }
+
+    const initialSort : Sort<Employee>= {
       created_at: 'desc'
     }
 
-    return {
-      employees: [] as Employee[],
-      sort,
-      totalCount: null as number | null,
-      currentPage: 1 as number,
-      query: {
-        first_name: {},
-        last_name: {}
-      } as WhereClause
-    }
-  },
-  created() {
-    EventBus.$on('employee_save', (employee: Employee) => {
-      this.search()
-    })
-    this.search()
-  },
-  computed: {
-    scope(): Scope<typeof Employee> {
-      return Employee
-        .where(this.query)
-        .order(this.sort)
-        .page(this.currentPage)
-        .per(10)
-        .stats({ total: "count" })
-        .includes({ current_position: "department" })
-    },
-    hasPrevPage() : boolean {
-      return this.currentPage > 1
-    },
-    hasNextPage() : boolean {
-      return (this.currentPage * 10) < (this.totalCount || 0)
-    }
-  },
-  methods: {
-    async search() {
-      let { data, meta } = await this.scope.all()
-      this.employees = data
-      this.totalCount = meta.stats.total.count
-    },
-    doSort(attribute: string) {
-      if (this.sort[attribute] && this.sort[attribute] === "desc") {
-        this.sort = {[attribute]: "asc"}
-      } else {
-        this.sort = {[attribute]: "desc"}
+    const currentPage = value(1)
+    const scope = value(initialScope)
+    const sort = value(initialSort)
+
+    const query = computed(() : GraphitiListQuery<Employee> => {
+      return {
+        where: scope.value,
+        sort: sort.value,
+        stats: {
+          total: 'count'
+        },
+        include: {
+          current_position: "department"
+        },
+        page: currentPage.value,
+        perPage: 10
       }
-      this.search()
-    },
-    paginate(back: boolean = false) {
+    })
+
+    const {
+      results: employees,
+      resultsMeta,
+      loading,
+      updateScope,
+    } = employeeDirectoryApi.query('employees', query.value)
+
+    const totalCount = computed(() => {
+      if (resultsMeta.value && resultsMeta.value.total) {
+        return resultsMeta.value.stats.total.count
+      } else {
+        return undefined
+      }
+    })
+
+    const search = async () => {
+      updateScope(query.value)
+    }
+
+    const doSort = (attribute: string) => {
+      if (sort.value[attribute] && sort.value[attribute] === "desc") {
+        sort.value = {[attribute]: "asc"}
+      } else {
+        sort.value = {[attribute]: "desc"}
+      }
+
+      search()
+    }
+
+    const paginate = (back: boolean = false) => {
       let count = 1
       if (back) count = -1
-      this.currentPage = this.currentPage + count
-      this.search()
-    },
-    selectEmployee(employee: Employee): void {
+      currentPage.value += count
+
+      search()
+    }
+
+    const selectEmployee = (employee: Employee): void => {
       EventBus.$emit('employee_selected', employee.id)
+    }
+
+    onCreated(() => {
+      EventBus.$on('employee_save', (employee: Employee) => {
+        search()
+      })
+    })
+
+    return {
+      employees,
+      sort,
+      totalCount,
+      currentPage,
+      query,
+      scope,
+      hasPrevPage: computed(() => {
+        return currentPage.value > 1
+      }),
+      hasNextPage: computed(() => {
+        return (currentPage.value * 10) < (totalCount.value || 0)
+      }),
+      search,
+      doSort,
+      paginate,
+      selectEmployee
     }
   }
 });
